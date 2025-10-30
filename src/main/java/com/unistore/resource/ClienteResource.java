@@ -1,25 +1,26 @@
 package com.unistore.resource;
 
 import com.unistore.entity.Cliente;
+import io.quarkus.elytron.security.common.BcryptUtil;
 import jakarta.transaction.Transactional;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import java.util.List;
 
-@Path("/clientes")
+@Path("/api/clientes")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
 public class ClienteResource {
-
+    
     @GET
-    public List<Cliente> listarTodos() {
-        return Cliente.listAll();
+    public List<Cliente> listarTodosClientes() {
+        return Cliente.list("ativo = true");
     }
     
     @GET
     @Path("/{id}")
-    public Response buscarPorId(@PathParam("id") Long id) {
+    public Response obterCliente(@PathParam("id") Long id) {
         Cliente cliente = Cliente.findById(id);
         if (cliente == null) {
             return Response.status(Response.Status.NOT_FOUND).build();
@@ -28,26 +29,40 @@ public class ClienteResource {
     }
     
     @POST
+    @Path("/registrar")
     @Transactional
-    public Response criar(Cliente cliente) {
+    public Response registrarCliente(Cliente cliente) {
+        // Verifica se o email já existe
+        Cliente existente = Cliente.find("email", cliente.email).firstResult();
+        if (existente != null) {
+            return Response.status(Response.Status.CONFLICT)
+                .entity("Email já cadastrado").build();
+        }
+        
+        // Criptografa a senha
+        cliente.senha = BcryptUtil.bcryptHash(cliente.senha);
         cliente.persist();
+        
         return Response.status(Response.Status.CREATED).entity(cliente).build();
     }
     
     @PUT
     @Path("/{id}")
     @Transactional
-    public Response atualizar(@PathParam("id") Long id, Cliente clienteAtualizado) {
+    public Response atualizarCliente(@PathParam("id") Long id, Cliente clienteAtualizado) {
         Cliente cliente = Cliente.findById(id);
         if (cliente == null) {
             return Response.status(Response.Status.NOT_FOUND).build();
         }
         
         cliente.nome = clienteAtualizado.nome;
-        cliente.cpf = clienteAtualizado.cpf;
+        cliente.sobrenome = clienteAtualizado.sobrenome;
         cliente.telefone = clienteAtualizado.telefone;
-        cliente.email = clienteAtualizado.email;
         cliente.endereco = clienteAtualizado.endereco;
+        cliente.cidade = clienteAtualizado.cidade;
+        cliente.estado = clienteAtualizado.estado;
+        cliente.cep = clienteAtualizado.cep;
+        cliente.pais = clienteAtualizado.pais;
         
         return Response.ok(cliente).build();
     }
@@ -55,11 +70,13 @@ public class ClienteResource {
     @DELETE
     @Path("/{id}")
     @Transactional
-    public Response deletar(@PathParam("id") Long id) {
-        boolean deleted = Cliente.deleteById(id);
-        if (!deleted) {
+    public Response deletarCliente(@PathParam("id") Long id) {
+        Cliente cliente = Cliente.findById(id);
+        if (cliente == null) {
             return Response.status(Response.Status.NOT_FOUND).build();
         }
+        
+        cliente.ativo = false;
         return Response.noContent().build();
     }
 }

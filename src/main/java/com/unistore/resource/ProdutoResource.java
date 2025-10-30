@@ -7,19 +7,22 @@ import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import java.util.List;
 
-@Path("/produtos")
+@Path("/api/produtos")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
 public class ProdutoResource {
-
+    
     @GET
-    public List<Produto> listarTodos() {
-        return Produto.listAll();
+    public List<Produto> listarTodosProdutos(@QueryParam("categoria") String categoria) {
+        if (categoria != null && !categoria.isEmpty()) {
+            return Produto.list("categoria = ?1 and ativo = true", categoria);
+        }
+        return Produto.list("ativo = true");
     }
     
     @GET
     @Path("/{id}")
-    public Response buscarPorId(@PathParam("id") Long id) {
+    public Response obterProduto(@PathParam("id") Long id) {
         Produto produto = Produto.findById(id);
         if (produto == null) {
             return Response.status(Response.Status.NOT_FOUND).build();
@@ -29,7 +32,7 @@ public class ProdutoResource {
     
     @POST
     @Transactional
-    public Response criar(Produto produto) {
+    public Response criarProduto(Produto produto) {
         produto.persist();
         return Response.status(Response.Status.CREATED).entity(produto).build();
     }
@@ -37,16 +40,19 @@ public class ProdutoResource {
     @PUT
     @Path("/{id}")
     @Transactional
-    public Response atualizar(@PathParam("id") Long id, Produto produtoAtualizado) {
+    public Response atualizarProduto(@PathParam("id") Long id, Produto produtoAtualizado) {
         Produto produto = Produto.findById(id);
         if (produto == null) {
             return Response.status(Response.Status.NOT_FOUND).build();
         }
         
         produto.nome = produtoAtualizado.nome;
+        produto.descricao = produtoAtualizado.descricao;
         produto.preco = produtoAtualizado.preco;
         produto.estoque = produtoAtualizado.estoque;
-        produto.imagem = produtoAtualizado.imagem;
+        produto.urlImagem = produtoAtualizado.urlImagem;
+        produto.categoria = produtoAtualizado.categoria;
+        produto.ativo = produtoAtualizado.ativo;
         
         return Response.ok(produto).build();
     }
@@ -54,11 +60,20 @@ public class ProdutoResource {
     @DELETE
     @Path("/{id}")
     @Transactional
-    public Response deletar(@PathParam("id") Long id) {
-        boolean deleted = Produto.deleteById(id);
-        if (!deleted) {
+    public Response deletarProduto(@PathParam("id") Long id) {
+        Produto produto = Produto.findById(id);
+        if (produto == null) {
             return Response.status(Response.Status.NOT_FOUND).build();
         }
+        
+        produto.ativo = false;
         return Response.noContent().build();
+    }
+    
+    @GET
+    @Path("/buscar")
+    public List<Produto> buscarProdutos(@QueryParam("q") String consulta) {
+        return Produto.list("lower(nome) like ?1 and ativo = true", 
+            "%" + consulta.toLowerCase() + "%");
     }
 }
